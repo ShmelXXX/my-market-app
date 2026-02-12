@@ -55,4 +55,8 @@ public class ItemService {
 
         return PageRequest.of(pageNumber - 1, pageSize, sorting);
     }
+
+    public Item saveItem(Item item) {
+        return itemRepository.save(item);
+    }
 }

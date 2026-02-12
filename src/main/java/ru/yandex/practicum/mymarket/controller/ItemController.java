@@ -144,4 +144,34 @@ public class ItemController {
         model.addAttribute("item", itemDto);
         return "item";
     }
+
+    @PostMapping("/admin/items/add")
+    public String addItem(
+            @RequestParam String title,
+            @RequestParam String description,
+            @RequestParam String imgPath,
+            @RequestParam Long price,
+            @RequestParam Integer stock,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false, defaultValue = "NO") String sort,
+            @RequestParam(required = false, defaultValue = "1") int pageNumber,
+            @RequestParam(required = false, defaultValue = "5") int pageSize,
+            HttpServletRequest request) {
+
+        Item item = new Item();
+        item.setTitle(title);
+        item.setDescription(description);
+
+        item.setImgPath(imgPath);
+
+        item.setPrice(price);
+        item.setStock(stock);
+
+        itemService.saveItem(item);
+
+        return "redirect:/items?sort=" + sort +
+                "&pageNumber=" + pageNumber +
+                "&pageSize=" + pageSize +
+                (search != null ? "&search=" + search : "");
+    }
 }
