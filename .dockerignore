@@ -1,0 +1,15 @@
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**
+!**/src/test/**
+**/test/
+**/tests/
+**/surefire-reports/
+**/test-classes/
+**/target/
+**/.*
+**/docker-compose.yml
+**/README.md
+**/HELP.md
+**/*.log
+**/data/
