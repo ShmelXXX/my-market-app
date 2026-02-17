@@ -40,17 +40,11 @@ public class ItemService {
         Sort sorting = Sort.unsorted();
 
         if (sort != null) {
-            switch (sort.toUpperCase()) {
-                case "ALPHA":
-                    sorting = Sort.by("title").ascending();
-                    break;
-                case "PRICE":
-                    sorting = Sort.by("price").ascending();
-                    break;
-                case "NO":
-                default:
-                    sorting = Sort.unsorted();
-            }
+            sorting = switch (sort.toUpperCase()) {
+                case "ALPHA" -> Sort.by("title").ascending();
+                case "PRICE" -> Sort.by("price").ascending();
+                default -> Sort.unsorted();
+            };
         }
 
         return PageRequest.of(pageNumber - 1, pageSize, sorting);

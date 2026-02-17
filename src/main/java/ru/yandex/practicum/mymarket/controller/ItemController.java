@@ -1,10 +1,15 @@
 package ru.yandex.practicum.mymarket.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import ru.yandex.practicum.mymarket.dto.ItemDto;
 import ru.yandex.practicum.mymarket.dto.PagingDto;
@@ -19,6 +24,9 @@ import java.util.stream.Collectors;
 @Controller
 @RequestMapping
 @RequiredArgsConstructor
+
+@Validated
+
 public class ItemController {
 
     private final ItemService itemService;
@@ -26,10 +34,22 @@ public class ItemController {
 
     @GetMapping({"/", "/items"})
     public String getItems(
-            @RequestParam(required = false) String search,
-            @RequestParam(required = false, defaultValue = "NO") String sort,
-            @RequestParam(required = false, defaultValue = "1") int pageNumber,
-            @RequestParam(required = false, defaultValue = "5") int pageSize,
+            @RequestParam(required = false)
+            @Size(max = 100, message = "Поисковый запрос не может превышать 100 символов")
+            String search,
+
+            @RequestParam(required = false, defaultValue = "NO")
+            String sort,
+
+            @RequestParam(required = false, defaultValue = "1")
+            @Min(value = 1, message = "Номер страницы должен быть не менее 1")
+            int pageNumber,
+
+            @RequestParam(required = false, defaultValue = "5")
+            @Min(value = 1, message = "Размер страницы должен быть не менее 1")
+            @Max(value = 100, message = "Размер страницы не может превышать 100")
+            int pageSize,
+
             HttpServletRequest request,
             Model model) {
 
@@ -59,7 +79,7 @@ public class ItemController {
 
         // Добавляем заглушки, если последняя строка неполная
         if (!items.isEmpty()) {
-            List<ItemDto> lastRow = items.get(items.size() - 1);
+            List<ItemDto> lastRow = items.getLast();
             while (lastRow.size() < 3) {
                 lastRow.add(new ItemDto(-1L, "", "", "", 0L, 0));
             }
@@ -82,7 +102,10 @@ public class ItemController {
 
     @PostMapping("/items")
     public String updateCartItemFromItems(
-            @RequestParam Long id,
+            @RequestParam
+            @Min(value = 1, message = "ID товара должен быть положительным")
+            Long id,
+
             @RequestParam String action,
             @RequestParam(required = false) String search,
             @RequestParam(required = false, defaultValue = "NO") String sort,
@@ -104,7 +127,14 @@ public class ItemController {
     }
 
     @GetMapping("/items/{id}")
-    public String getItem(@PathVariable Long id, HttpServletRequest request, Model model) {
+    public String getItem(
+            @PathVariable
+            @Min(value = 1, message = "ID товара должен быть положительным")
+            Long id,
+
+            HttpServletRequest request,
+            Model model) {
+
         String sessionId = cartService.getSessionId(request);
         Item item = itemService.getItemById(id);
 
@@ -123,7 +153,10 @@ public class ItemController {
 
     @PostMapping("/items/{id}")
     public String updateCartItemFromItem(
-            @PathVariable Long id,
+            @PathVariable
+            @Min(value = 1, message = "ID товара должен быть положительным")
+            Long id,
+
             @RequestParam String action,
             HttpServletRequest request,
             Model model) {
@@ -147,15 +180,40 @@ public class ItemController {
 
     @PostMapping("/admin/items/add")
     public String addItem(
-            @RequestParam String title,
-            @RequestParam String description,
-            @RequestParam String imgPath,
-            @RequestParam Long price,
-            @RequestParam Integer stock,
+            @RequestParam
+            @Size(min = 3, max = 100, message = "Название товара должно содержать от 3 до 100 символов")
+            String title,
+
+            @RequestParam
+            @Size(max = 1000, message = "Описание товара не может превышать 1000 символов")
+            String description,
+
+            @RequestParam
+            @Size(max = 255, message = "Путь к изображению не может превышать 255 символов")
+            String imgPath,
+
+            @RequestParam
+            @Positive(message = "Цена товара должна быть положительной")
+            @Max(value = 1000000000L, message = "Цена товара не может превышать 1 000 000 000")
+            Long price,
+
+            @RequestParam
+            @Min(value = 0, message = "-Количество товара не может быть отрицательным")
+            @Max(value = 100000, message = "Количество товара не может превышать 100 000")
+            Integer stock,
+
             @RequestParam(required = false) String search,
             @RequestParam(required = false, defaultValue = "NO") String sort,
-            @RequestParam(required = false, defaultValue = "1") int pageNumber,
-            @RequestParam(required = false, defaultValue = "5") int pageSize,
+
+            @RequestParam(required = false, defaultValue = "1")
+            @Min(value = 1, message = "Номер страницы должен быть не менее 1")
+            int pageNumber,
+
+            @RequestParam(required = false, defaultValue = "5")
+            @Min(value = 1, message = "Размер страницы должен быть не менее 1")
+            @Max(value = 100, message = "Размер страницы не может превышать 100")
+            int pageSize,
+
             HttpServletRequest request) {
 
         Item item = new Item();

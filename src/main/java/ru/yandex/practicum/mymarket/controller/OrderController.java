@@ -1,9 +1,11 @@
 package ru.yandex.practicum.mymarket.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import ru.yandex.practicum.mymarket.dto.ItemDto;
 import ru.yandex.practicum.mymarket.dto.OrderDto;
@@ -17,6 +19,9 @@ import java.util.stream.Collectors;
 @Controller
 @RequestMapping("/orders")
 @RequiredArgsConstructor
+
+@Validated
+
 public class OrderController {
 
     private final OrderService orderService;
@@ -27,20 +32,7 @@ public class OrderController {
         List<Order> orders = orderService.getAllOrders();
 
         List<OrderDto> orderDtos = orders.stream()
-                .map(order -> {
-                    List<ItemDto> itemDtos = order.getItems().stream()
-                            .map(oi -> new ItemDto(
-                                    oi.getItem().getId(),
-                                    oi.getItem().getTitle(),
-                                    null, // Описание не нужно на странице заказов
-                                    null, // Картинка не нужна на странице заказов
-                                    oi.getPrice(),
-                                    oi.getQuantity()
-                            ))
-                            .collect(Collectors.toList());
-
-                    return new OrderDto(order.getId(), itemDtos, order.getTotalSum());
-                })
+                .map(this::convertToOrderDto)
                 .collect(Collectors.toList());
 
         model.addAttribute("orders", orderDtos);
@@ -48,23 +40,17 @@ public class OrderController {
     }
 
     @GetMapping("/{id}")
-    public String getOrder(@PathVariable Long id,
-                           @RequestParam(required = false, defaultValue = "false") boolean newOrder,
-                           Model model) {
+    public String getOrder(
+            @PathVariable
+            @Min(value = 1, message = "ID заказа должен быть положительным")
+            Long id,
+
+            @RequestParam(required = false, defaultValue = "false") boolean newOrder,
+            Model model) {
+
         Order order = orderService.getOrderById(id);
 
-        List<ItemDto> itemDtos = order.getItems().stream()
-                .map(oi -> new ItemDto(
-                        oi.getItem().getId(),
-                        oi.getItem().getTitle(),
-                        null,
-                        null,
-                        oi.getPrice(),
-                        oi.getQuantity()
-                ))
-                .collect(Collectors.toList());
-
-        OrderDto orderDto = new OrderDto(order.getId(), itemDtos, order.getTotalSum());
+        OrderDto orderDto = convertToOrderDto(order);
 
         model.addAttribute("order", orderDto);
         model.addAttribute("newOrder", newOrder);
@@ -80,13 +66,19 @@ public class OrderController {
         return "redirect:/orders/" + order.getId() + "?newOrder=true";
     }
 
-    @Controller
-    public class BuyController {
+    private OrderDto convertToOrderDto(Order order) {
+        List<ItemDto> itemDtos = order.getItems().stream()
+                .map(oi -> new ItemDto(
+                        oi.getItem().getId(),
+                        oi.getItem().getTitle(),
+                        null,
+                        null,
+                        oi.getPrice(),
+                        oi.getQuantity()
+                ))
+                .collect(Collectors.toList());
 
-        @PostMapping("/buy")
-        public String handleBuy() {
-            // Перенаправляем на /orders/buy
-            return "forward:/orders/buy";
-        }
+        return new OrderDto(order.getId(), itemDtos, order.getTotalSum());
     }
+
 }

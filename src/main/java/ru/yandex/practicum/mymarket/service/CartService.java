@@ -36,17 +36,31 @@ public class CartService {
 
     @Transactional
     public void updateCartItem(Long itemId, String action, String sessionId) {
+        if (itemId == null || itemId <= 0) {
+            throw new IllegalArgumentException("Некорректный ID товара");
+        }
+
+        if (sessionId == null || sessionId.trim().isEmpty()) {
+            throw new IllegalArgumentException("Некорректный ID сессии");
+        }
+
         Optional<CartItem> existingCartItem = cartItemRepository.findByItemIdAndSessionId(itemId, sessionId);
         Item item = itemRepository.findById(itemId)
-                .orElseThrow(() -> new RuntimeException("Товар не найден"));
+                .orElseThrow(() -> new IllegalArgumentException("Товар с ID " + itemId + " не найден"));
 
         switch (action.toUpperCase()) {
             case "PLUS":
                 if (existingCartItem.isPresent()) {
                     CartItem cartItem = existingCartItem.get();
+                    if (cartItem.getQuantity() >= item.getStock()) {
+                        throw new IllegalStateException("Недостаточно товара на складе. Доступно: " + item.getStock());
+                    }
                     cartItem.setQuantity(cartItem.getQuantity() + 1);
                     cartItemRepository.save(cartItem);
                 } else {
+                    if (item.getStock() < 1) {
+                        throw new IllegalStateException("Товар отсутствует на складе");
+                    }
                     CartItem newCartItem = new CartItem();
                     newCartItem.setItem(item);
                     newCartItem.setQuantity(1);

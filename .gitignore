@@ -17,5 +17,11 @@ target/
 build/*
 **/.idea/**
 .idea/libraries/
-.data/*
+
+### База данных H2 ###
+data/
+*.db
+*.mv.db
+*.trace.db
+
 docker
