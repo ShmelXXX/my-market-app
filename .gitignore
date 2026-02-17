@@ -16,5 +16,6 @@ target/
 .gradle
 build/*
 **/.idea/**
-data
-
+.idea/libraries/
+.data/*
+docker

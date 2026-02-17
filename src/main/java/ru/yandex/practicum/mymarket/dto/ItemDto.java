@@ -1,42 +1,36 @@
 package ru.yandex.practicum.mymarket.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+public record ItemDto(
+        Long id,
+        String title,
+        String description,
+        String imgPath,
+        Long price,
+        Integer count
+) {}
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class ItemDto {
-    private Long id;
-    private String title;
-    private String description;
-    private String imgPath;
-    private Long price;
-    private Integer count;
-
-    // Добавляем методы, которые используются в HTML шаблонах
-    public Long id() {
-        return id;
-    }
-
-    public String title() {
-        return title;
-    }
-
-    public String description() {
-        return description;
-    }
-
-    public String imgPath() {
-        return imgPath;
-    }
-
-    public Long price() {
-        return price;
-    }
-
-    public Integer count() {
-        return count;
-    }
-}
+//    // Добавляем методы, которые используются в HTML шаблонах
+//    public Long id() {
+//        return id;
+//    }
+//
+//    public String title() {
+//        return title;
+//    }
+//
+//    public String description() {
+//        return description;
+//    }
+//
+//    public String imgPath() {
+//        return imgPath;
+//    }
+//
+//    public Long price() {
+//        return price;
+//    }
+//
+//    public Integer count() {
+//        return count;
+//    }
+//}

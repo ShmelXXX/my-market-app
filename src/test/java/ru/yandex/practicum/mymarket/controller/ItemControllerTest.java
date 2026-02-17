@@ -233,8 +233,8 @@ class ItemControllerTest {
         verify(itemService).getItems(isNull(), eq("NO"), eq(pageNumber), eq(pageSize));
         verify(model).addAttribute(eq("paging"), argThat(paging -> {
             PagingDto pagingDto = (PagingDto) paging;
-            assertThat(pagingDto.getPageNumber()).isEqualTo(pageNumber);
-            assertThat(pagingDto.getPageSize()).isEqualTo(pageSize);
+            assertThat(pagingDto.pageNumber()).isEqualTo(pageNumber);
+            assertThat(pagingDto.pageSize()).isEqualTo(pageSize);
             return true;
         }));
     }
