@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: my-market-app
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:h2:file:/data/mymarketdb
+    volumes:
+      - ./data:/data  # для сохранения H2 базы данных
+      - ./images:/app/static/images  # для загрузки изображений
+    restart: unless-stopped
