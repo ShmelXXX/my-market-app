@@ -37,16 +37,15 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
-        <!-- Spring Boot Data JPA -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-jpa</artifactId>
+            <artifactId>spring-boot-starter-data-r2dbc</artifactId>
         </dependency>
 
-        <!-- H2 Database -->
+        <!-- R2DBC драйвер для H2 -->
         <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
+            <groupId>io.r2dbc</groupId>
+            <artifactId>r2dbc-h2</artifactId>
             <scope>runtime</scope>
         </dependency>
 
@@ -65,15 +64,7 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <scope>provided</scope>  <!-- было compile, стало provided -->
-        </dependency>
-
-
-        <!-- Source: https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-data-jpa-test -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-data-jpa-test</artifactId>
-            <scope>test</scope>
+            <optional>true</optional>   <!-- было compile, затем было provided -->
         </dependency>
 
         <dependency>

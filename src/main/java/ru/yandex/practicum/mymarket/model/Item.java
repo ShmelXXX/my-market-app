@@ -1,30 +1,33 @@
 package ru.yandex.practicum.mymarket.model;
 
-import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-@Entity
-@Table(name = "items")
 @Data
 @NoArgsConstructor
+@AllArgsConstructor
+@Table("ITEMS")
 public class Item {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column("ID")
     private Long id;
 
-    @Column(nullable = false)
+    @Column("TITLE")
     private String title;
 
-    @Column(length = 1000)
+    @Column("DESCRIPTION")
     private String description;
 
-    @Column(nullable = false)
+    @Column("IMG_PATH")
     private String imgPath;
 
-    @Column(nullable = false)
+    @Column("PRICE")
     private Long price;
 
-    @Column(nullable = false)
+    @Column("STOCK")
     private Integer stock;
 }

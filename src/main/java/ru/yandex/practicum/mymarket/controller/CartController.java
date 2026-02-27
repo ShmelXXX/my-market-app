@@ -5,12 +5,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.dto.ItemDto;
-import ru.yandex.practicum.mymarket.model.CartItem;
 import ru.yandex.practicum.mymarket.service.CartService;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/cart")
@@ -20,56 +19,59 @@ public class CartController {
     private final CartService cartService;
 
     @GetMapping("/items")
-    public String getCart(HttpServletRequest request, Model model) {
+    public Mono<String> getCart(HttpServletRequest request, Model model) {
         String sessionId = cartService.getSessionId(request);
-        List<CartItem> cartItems = cartService.getCartItems(sessionId);
 
-        List<ItemDto> itemDtos = cartItems.stream()
-                .map(ci -> new ItemDto(
-                        ci.getItem().getId(),
-                        ci.getItem().getTitle(),
-                        ci.getItem().getDescription(),
-                        ci.getItem().getImgPath(),
-                        ci.getItem().getPrice(),
-                        ci.getQuantity()
-                ))
-                .collect(Collectors.toList());
+        return cartService.getCartItemsWithDetails(sessionId)
+                .map(this::convertToItemDto)
+                .collectList()
+                .zipWith(cartService.getTotalSum(sessionId))
+                .map(tuple -> {
+                    List<ItemDto> itemDtos = tuple.getT1();
+                    Long total = tuple.getT2();
 
-        Long total = cartService.getTotalSum(sessionId);
+                    model.addAttribute("items", itemDtos);
+                    model.addAttribute("total", total);
 
-        model.addAttribute("items", itemDtos);
-        model.addAttribute("total", total);
-
-        return "cart";
+                    return "cart";
+                });
     }
 
     @PostMapping("/items")
-    public String updateCartItem(
+    public Mono<String> updateCartItem(
             @RequestParam Long id,
             @RequestParam String action,
             HttpServletRequest request,
             Model model) {
 
         String sessionId = cartService.getSessionId(request);
-        cartService.updateCartItem(id, action, sessionId);
 
-        List<CartItem> cartItems = cartService.getCartItems(sessionId);
-        List<ItemDto> itemDtos = cartItems.stream()
-                .map(ci -> new ItemDto(
-                        ci.getItem().getId(),
-                        ci.getItem().getTitle(),
-                        ci.getItem().getDescription(),
-                        ci.getItem().getImgPath(),
-                        ci.getItem().getPrice(),
-                        ci.getQuantity()
-                ))
-                .collect(Collectors.toList());
+        return cartService.updateCartItem(id, action, sessionId)
+                .then(Mono.defer(() ->
+                        cartService.getCartItemsWithDetails(sessionId)
+                                .map(this::convertToItemDto)
+                                .collectList()
+                                .zipWith(cartService.getTotalSum(sessionId))
+                                .map(tuple -> {
+                                    List<ItemDto> itemDtos = tuple.getT1();
+                                    Long total = tuple.getT2();
 
-        Long total = cartService.getTotalSum(sessionId);
+                                    model.addAttribute("items", itemDtos);
+                                    model.addAttribute("total", total);
 
-        model.addAttribute("items", itemDtos);
-        model.addAttribute("total", total);
+                                    return "cart";
+                                })
+                ));
+    }
 
-        return "cart";
+    private ItemDto convertToItemDto(CartService.CartItemWithItem cartItemWithItem) {
+        return new ItemDto(
+                cartItemWithItem.getItem().getId(),
+                cartItemWithItem.getItem().getTitle(),
+                cartItemWithItem.getItem().getDescription(),
+                cartItemWithItem.getItem().getImgPath(),
+                cartItemWithItem.getItem().getPrice(),
+                cartItemWithItem.getQuantity()
+        );
     }
 }
