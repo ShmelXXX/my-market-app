@@ -1,25 +1,31 @@
 package ru.yandex.practicum.mymarket.model;
 
-import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-@Entity
-@Table(name = "cart_items")
 @Data
 @NoArgsConstructor
+@AllArgsConstructor
+@Table("CART_ITEMS")
 public class CartItem {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column("ID")
     private Long id;
 
-    @ManyToOne
-    @JoinColumn(name = "item_id", nullable = false)
-    private Item item;
+    @Column("ITEM_ID")
+    private Long itemId;
 
-    @Column(nullable = false)
+    @Column("QUANTITY")
     private Integer quantity;
 
-    @Column(nullable = false)
+    @Column("SESSION_ID")
     private String sessionId;
+
+    @Transient
+    private Item item;
 }

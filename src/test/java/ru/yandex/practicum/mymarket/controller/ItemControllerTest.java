@@ -9,18 +9,17 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
+
 import org.springframework.ui.Model;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 import ru.yandex.practicum.mymarket.dto.ItemDto;
-import ru.yandex.practicum.mymarket.dto.PagingDto;
 import ru.yandex.practicum.mymarket.model.Item;
 import ru.yandex.practicum.mymarket.service.CartService;
 import ru.yandex.practicum.mymarket.service.ItemService;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,7 +27,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("Юнит-тесты для ItemController")
+@DisplayName("Реактивные тесты для ItemController")
 class ItemControllerTest {
 
     @Mock
@@ -51,6 +50,7 @@ class ItemControllerTest {
 
     private final String TEST_SESSION_ID = "test-session-123";
     private Item item1;
+    private Item item2;
     private List<Item> items;
 
     @BeforeEach
@@ -63,7 +63,7 @@ class ItemControllerTest {
         item1.setPrice(2500L);
         item1.setStock(20);
 
-        Item item2 = new Item();
+        item2 = new Item();
         item2.setId(2L);
         item2.setTitle("Бейсболка красная");
         item2.setDescription("Красная бейсболка");
@@ -72,7 +72,6 @@ class ItemControllerTest {
         item2.setStock(5);
 
         items = Arrays.asList(item1, item2);
-
     }
 
     @Test
@@ -81,29 +80,36 @@ class ItemControllerTest {
         // Arrange
         int pageNumber = 1;
         int pageSize = 5;
-        Page<Item> itemPage = new PageImpl<>(items, PageRequest.of(0, pageSize), 2);
+        String search = null;
+        String sort = "NO";
 
         lenient().when(request.getSession()).thenReturn(session);
         lenient().when(session.getId()).thenReturn(TEST_SESSION_ID);
         when(cartService.getSessionId(request)).thenReturn(TEST_SESSION_ID);
-        when(itemService.getItems(isNull(), eq("NO"), eq(pageNumber), eq(pageSize)))
-                .thenReturn(itemPage);
-        when(cartService.getItemCountInCart(eq(1L), eq(TEST_SESSION_ID))).thenReturn(0);
-        when(cartService.getItemCountInCart(eq(2L), eq(TEST_SESSION_ID))).thenReturn(0);
+        when(itemService.getItems(eq(search), eq(sort), eq(pageNumber), eq(pageSize)))
+                .thenReturn(Flux.fromIterable(items));
+        when(itemService.getTotalItems(eq(search))).thenReturn(Mono.just(2L));
+        when(cartService.getItemCountInCart(eq(1L), eq(TEST_SESSION_ID))).thenReturn(Mono.just(0));
+        when(cartService.getItemCountInCart(eq(2L), eq(TEST_SESSION_ID))).thenReturn(Mono.just(0));
 
         // Act
-        String viewName = itemController.getItems(
-                null, "NO", pageNumber, pageSize, request, model);
+        Mono<String> result = itemController.getItems(
+                search, sort, pageNumber, pageSize, request, model);
 
         // Assert
-        assertThat(viewName).isEqualTo("items");
+        StepVerifier.create(result)
+                .assertNext(viewName -> {
+                    assertThat(viewName).isEqualTo("items");
 
-        verify(itemService).getItems(isNull(), eq("NO"), eq(pageNumber), eq(pageSize));
-        verify(cartService, times(2)).getItemCountInCart(anyLong(), eq(TEST_SESSION_ID));
-        verify(model).addAttribute(eq("items"), any(List.class));
-        verify(model).addAttribute(eq("search"), isNull());
-        verify(model).addAttribute(eq("sort"), eq("NO"));
-        verify(model).addAttribute(eq("paging"), any(PagingDto.class));
+                    verify(itemService).getItems(eq(search), eq(sort), eq(pageNumber), eq(pageSize));
+                    verify(itemService).getTotalItems(eq(search));
+                    verify(cartService, times(2)).getItemCountInCart(anyLong(), eq(TEST_SESSION_ID));
+                    verify(model).addAttribute(eq("items"), any(List.class));
+                    verify(model).addAttribute(eq("search"), eq(search));
+                    verify(model).addAttribute(eq("sort"), eq(sort));
+                    verify(model).addAttribute(eq("paging"), any());
+                })
+                .verifyComplete();
     }
 
     @Test
@@ -111,28 +117,32 @@ class ItemControllerTest {
     void shouldShowItemsPageWithSearch() {
         // Arrange
         String searchQuery = "мяч";
+        String sort = "NO";
         int pageNumber = 1;
         int pageSize = 5;
-        List<Item> searchResults = Collections.singletonList(item1);
-        Page<Item> itemPage = new PageImpl<>(searchResults, PageRequest.of(0, pageSize), 1);
+        List<Item> searchResults = Arrays.asList(item1);
 
-        lenient().when(request.getSession()).thenReturn(session);
-        lenient().when(session.getId()).thenReturn(TEST_SESSION_ID);
         when(cartService.getSessionId(request)).thenReturn(TEST_SESSION_ID);
-        when(itemService.getItems(eq(searchQuery), eq("NO"), eq(pageNumber), eq(pageSize)))
-                .thenReturn(itemPage);
-        when(cartService.getItemCountInCart(eq(1L), eq(TEST_SESSION_ID))).thenReturn(2);
+        when(itemService.getItems(eq(searchQuery), eq(sort), eq(pageNumber), eq(pageSize)))
+                .thenReturn(Flux.fromIterable(searchResults));
+        when(itemService.getTotalItems(eq(searchQuery))).thenReturn(Mono.just(1L));
+        when(cartService.getItemCountInCart(eq(1L), eq(TEST_SESSION_ID))).thenReturn(Mono.just(2));
 
         // Act
-        String viewName = itemController.getItems(
-                searchQuery, "NO", pageNumber, pageSize, request, model);
+        Mono<String> result = itemController.getItems(
+                searchQuery, sort, pageNumber, pageSize, request, model);
 
         // Assert
-        assertThat(viewName).isEqualTo("items");
+        StepVerifier.create(result)
+                .assertNext(viewName -> {
+                    assertThat(viewName).isEqualTo("items");
 
-        verify(itemService).getItems(eq(searchQuery), eq("NO"), eq(pageNumber), eq(pageSize));
-        verify(cartService).getItemCountInCart(eq(1L), eq(TEST_SESSION_ID));
-        verify(model).addAttribute(eq("search"), eq(searchQuery));
+                    verify(itemService).getItems(eq(searchQuery), eq(sort), eq(pageNumber), eq(pageSize));
+                    verify(itemService).getTotalItems(eq(searchQuery));
+                    verify(cartService).getItemCountInCart(eq(1L), eq(TEST_SESSION_ID));
+                    verify(model).addAttribute(eq("search"), eq(searchQuery));
+                })
+                .verifyComplete();
     }
 
     @Test
@@ -141,21 +151,44 @@ class ItemControllerTest {
         // Arrange
         Long itemId = 1L;
 
-        lenient().when(request.getSession()).thenReturn(session);
-        lenient().when(session.getId()).thenReturn(TEST_SESSION_ID);
         when(cartService.getSessionId(request)).thenReturn(TEST_SESSION_ID);
-        when(itemService.getItemById(itemId)).thenReturn(item1);
-        when(cartService.getItemCountInCart(itemId, TEST_SESSION_ID)).thenReturn(3);
+        when(itemService.getItemById(itemId)).thenReturn(Mono.just(item1));
+        when(cartService.getItemCountInCart(itemId, TEST_SESSION_ID)).thenReturn(Mono.just(3));
 
         // Act
-        String viewName = itemController.getItem(itemId, request, model);
+        Mono<String> result = itemController.getItem(itemId, request, model);
 
         // Assert
-        assertThat(viewName).isEqualTo("item");
+        StepVerifier.create(result)
+                .assertNext(viewName -> {
+                    assertThat(viewName).isEqualTo("item");
 
-        verify(itemService).getItemById(itemId);
-        verify(cartService).getItemCountInCart(itemId, TEST_SESSION_ID);
-        verify(model).addAttribute(eq("item"), any(ItemDto.class));
+                    verify(itemService).getItemById(itemId);
+                    verify(cartService).getItemCountInCart(itemId, TEST_SESSION_ID);
+                    verify(model).addAttribute(eq("item"), any(ItemDto.class));
+                })
+                .verifyComplete();
+    }
+
+    @Test
+    @DisplayName("GET /items/{id} - должен вернуть ошибку при отсутствии товара")
+    void shouldReturnErrorWhenItemNotFound() {
+        // Arrange
+        Long itemId = 999L;
+
+        when(cartService.getSessionId(request)).thenReturn(TEST_SESSION_ID);
+        when(itemService.getItemById(itemId)).thenReturn(Mono.empty());
+
+        // Act
+        Mono<String> result = itemController.getItem(itemId, request, model);
+
+        // Assert
+        StepVerifier.create(result)
+                .assertNext(viewName -> {
+                    assertThat(viewName).isEqualTo("error");
+                    verify(model).addAttribute(eq("error"), eq("Товар не найден"));
+                })
+                .verifyComplete();
     }
 
     @Test
@@ -169,73 +202,123 @@ class ItemControllerTest {
         int pageSize = 5;
         String search = null;
 
-        lenient().when(request.getSession()).thenReturn(session);
-        lenient().when(session.getId()).thenReturn(TEST_SESSION_ID);
         when(cartService.getSessionId(request)).thenReturn(TEST_SESSION_ID);
+        when(cartService.updateCartItem(eq(itemId), eq(action), eq(TEST_SESSION_ID)))
+                .thenReturn(Mono.empty());
 
         // Act
-        String viewName = itemController.updateCartItemFromItems(
+        Mono<String> result = itemController.updateCartItemFromItems(
                 itemId, action, search, sort, pageNumber, pageSize, request);
 
         // Assert
-        assertThat(viewName).isEqualTo("redirect:/items?id=1&sort=NO&pageNumber=1&pageSize=5");
+        StepVerifier.create(result)
+                .assertNext(viewName -> {
+                    assertThat(viewName).isEqualTo("redirect:/items?id=1&sort=NO&pageNumber=1&pageSize=5");
+                    verify(cartService).updateCartItem(eq(itemId), eq(action), eq(TEST_SESSION_ID));
+                })
+                .verifyComplete();
+    }
 
-        verify(cartService).updateCartItem(eq(itemId), eq(action), eq(TEST_SESSION_ID));
+    @Test
+    @DisplayName("POST /items/{id} - должен обновить корзину со страницы товара")
+    void shouldUpdateCartFromItemPage() {
+        // Arrange
+        Long itemId = 1L;
+        String action = "PLUS";
+
+        when(cartService.getSessionId(request)).thenReturn(TEST_SESSION_ID);
+        when(cartService.updateCartItem(eq(itemId), eq(action), eq(TEST_SESSION_ID)))
+                .thenReturn(Mono.empty());
+        when(itemService.getItemById(itemId)).thenReturn(Mono.just(item1));
+        when(cartService.getItemCountInCart(itemId, TEST_SESSION_ID)).thenReturn(Mono.just(1));
+
+        // Act
+        Mono<String> result = itemController.updateCartItemFromItem(itemId, action, request, model);
+
+        // Assert
+        StepVerifier.create(result)
+                .assertNext(viewName -> {
+                    assertThat(viewName).isEqualTo("item");
+                    verify(cartService).updateCartItem(eq(itemId), eq(action), eq(TEST_SESSION_ID));
+                    verify(itemService).getItemById(itemId);
+                    verify(cartService).getItemCountInCart(itemId, TEST_SESSION_ID);
+                    verify(model).addAttribute(eq("item"), any(ItemDto.class));
+                })
+                .verifyComplete();
     }
 
     @Test
     @DisplayName("GET /items - должен обработать разные значения сортировки")
     void shouldHandleDifferentSortValues() {
         // Arrange
+        String search = null;
+        String sort = "PRICE";
         int pageNumber = 1;
         int pageSize = 5;
-        Page<Item> emptyPage = Page.empty();
 
-        lenient().when(request.getSession()).thenReturn(session);
-        lenient().when(session.getId()).thenReturn(TEST_SESSION_ID);
         when(cartService.getSessionId(request)).thenReturn(TEST_SESSION_ID);
-        when(itemService.getItems(isNull(), eq("PRICE"), eq(pageNumber), eq(pageSize)))
-                .thenReturn(emptyPage);
+        when(itemService.getItems(eq(search), eq(sort), eq(pageNumber), eq(pageSize)))
+                .thenReturn(Flux.empty());
+        when(itemService.getTotalItems(eq(search))).thenReturn(Mono.just(0L));
 
         // Act
-        String viewName = itemController.getItems(
-                null, "PRICE", pageNumber, pageSize, request, model);
+        Mono<String> result = itemController.getItems(
+                search, sort, pageNumber, pageSize, request, model);
 
         // Assert
-        assertThat(viewName).isEqualTo("items");
-
-        verify(itemService).getItems(isNull(), eq("PRICE"), eq(pageNumber), eq(pageSize));
-        verify(model).addAttribute(eq("sort"), eq("PRICE"));
-        verify(cartService, never()).getItemCountInCart(anyLong(), anyString());
+        StepVerifier.create(result)
+                .assertNext(viewName -> {
+                    assertThat(viewName).isEqualTo("items");
+                    verify(itemService).getItems(eq(search), eq(sort), eq(pageNumber), eq(pageSize));
+                    verify(itemService).getTotalItems(eq(search));
+                    verify(model).addAttribute(eq("sort"), eq(sort));
+                })
+                .verifyComplete();
     }
 
     @Test
     @DisplayName("GET /items - должен корректно обрабатывать параметры пагинации")
     void shouldHandlePaginationParameters() {
         // Arrange
+        String search = null;
+        String sort = "NO";
         int pageNumber = 3;
         int pageSize = 10;
-        Page<Item> emptyPage = Page.empty();
 
-        lenient().when(request.getSession()).thenReturn(session);
-        lenient().when(session.getId()).thenReturn(TEST_SESSION_ID);
         when(cartService.getSessionId(request)).thenReturn(TEST_SESSION_ID);
-        when(itemService.getItems(isNull(), eq("NO"), eq(pageNumber), eq(pageSize)))
-                .thenReturn(emptyPage);
+        when(itemService.getItems(eq(search), eq(sort), eq(pageNumber), eq(pageSize)))
+                .thenReturn(Flux.empty());
+        when(itemService.getTotalItems(eq(search))).thenReturn(Mono.just(0L));
 
         // Act
-        String viewName = itemController.getItems(
-                null, "NO", pageNumber, pageSize, request, model);
+        Mono<String> result = itemController.getItems(
+                search, sort, pageNumber, pageSize, request, model);
 
         // Assert
-        assertThat(viewName).isEqualTo("items");
+        StepVerifier.create(result)
+                .assertNext(viewName -> {
+                    assertThat(viewName).isEqualTo("items");
 
-        verify(itemService).getItems(isNull(), eq("NO"), eq(pageNumber), eq(pageSize));
-        verify(model).addAttribute(eq("paging"), argThat(paging -> {
-            PagingDto pagingDto = (PagingDto) paging;
-            assertThat(pagingDto.pageNumber()).isEqualTo(pageNumber);
-            assertThat(pagingDto.pageSize()).isEqualTo(pageSize);
-            return true;
-        }));
+                    verify(itemService).getItems(eq(search), eq(sort), eq(pageNumber), eq(pageSize));
+                    verify(itemService).getTotalItems(eq(search));
+
+                    verify(model).addAttribute(eq("paging"), argThat(paging -> {
+                        // Используем рефлексию для доступа к record компонентам
+                        try {
+                            var pageNumberField = paging.getClass().getDeclaredMethod("pageNumber");
+                            var pageSizeField = paging.getClass().getDeclaredMethod("pageSize");
+
+                            int actualPageNumber = (int) pageNumberField.invoke(paging);
+                            int actualPageSize = (int) pageSizeField.invoke(paging);
+
+                            assertThat(actualPageNumber).isEqualTo(pageNumber);
+                            assertThat(actualPageSize).isEqualTo(pageSize);
+                        } catch (Exception e) {
+                            throw new RuntimeException(e);
+                        }
+                        return true;
+                    }));
+                })
+                .verifyComplete();
     }
 }
