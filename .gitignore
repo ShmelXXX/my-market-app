@@ -25,3 +25,9 @@ data/
 *.trace.db
 
 docker
+
+# Images
+**/static/images/*.png
+**/static/images/*.jpg
+**/static/images/*.jpeg
+**/static/images/*.gif
