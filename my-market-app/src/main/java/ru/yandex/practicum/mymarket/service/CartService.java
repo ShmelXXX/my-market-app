@@ -102,19 +102,4 @@ public class CartService {
         cartItemRepository.deleteBySessionId(sessionId);
     }
 
-//    public String getUserId(HttpServletRequest request) {
-//        // Пробуем получить из сессии
-//        HttpSession session = request.getSession();
-//        String userId = (String) session.getAttribute("userId");
-//
-//        if (userId == null) {
-//            // Если нет в сессии, генерируем на основе sessionId
-//            String sessionId = getSessionId(request);
-//            userId = "user_" + Math.abs(sessionId.hashCode() % 10000);
-//            session.setAttribute("userId", userId);
-//        }
-//
-//        return userId;
-//    }
-
 }

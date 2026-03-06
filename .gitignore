@@ -17,6 +17,7 @@ target/
 build/*
 **/.idea/**
 .idea/libraries/
+*.ico
 
 ### База данных H2 ###
 data/
