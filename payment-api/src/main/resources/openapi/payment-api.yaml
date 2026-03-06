@@ -1,0 +1,404 @@
+openapi: 3.0.1
+info:
+  title: Payment Service API
+  description: API для обработки платежей интернет-магазина
+  version: 1.0.0
+  contact:
+    name: MyMarket Support
+    email: support@mymarket.ru
+
+servers:
+  - url: http://localhost:8081/api/v1
+    description: Локальный сервер платежного сервиса
+
+tags:
+  - name: Payments
+    description: Операции с платежами
+
+paths:
+  /payments:
+    post:
+      tags:
+        - Payments
+      summary: Создание нового платежа
+      operationId: createPayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentRequest'
+      responses:
+        '200':
+          description: Платеж успешно создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '402':
+          description: Ошибка обработки платежа (недостаточно средств)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /payments/{paymentId}:
+    get:
+      tags:
+        - Payments
+      summary: Получение информации о платеже
+      operationId: getPaymentById
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID платежа
+      responses:
+        '200':
+          description: Информация о платеже
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentDetails'
+        '404':
+          description: Платеж не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /payments/{paymentId}/refund:
+    post:
+      tags:
+        - Payments
+      summary: Возврат платежа
+      operationId: refundPayment
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefundRequest'
+      responses:
+        '200':
+          description: Возврат успешно обработан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefundResponse'
+        '404':
+          description: Платеж не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Невозможно выполнить возврат
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /balance/{userId}:
+    get:
+      tags:
+        - Payments
+      summary: Получение баланса пользователя
+      operationId: getUserBalance
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID пользователя
+      responses:
+        '200':
+          description: Баланс пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceResponse'
+        '404':
+          description: Пользователь не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Сервис недоступен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    PaymentRequest:
+      type: object
+      required:
+        - orderId
+        - amount
+        - currency
+        - paymentMethod
+      properties:
+        orderId:
+          type: string
+          description: ID заказа в магазине
+          example: "12345"
+        amount:
+          type: integer
+          description: Сумма платежа в минимальных единицах валюты (копейки)
+          minimum: 1
+          maximum: 1000000000
+          example: 250000
+        currency:
+          type: string
+          description: Валюта платежа (ISO 4217)
+          enum: [RUB, USD, EUR]
+          default: RUB
+        description:
+          type: string
+          description: Описание платежа
+          maxLength: 255
+          example: "Оплата заказа №12345"
+        paymentMethod:
+          type: string
+          description: Способ оплаты
+          enum: [CARD, CASH, ONLINE]
+          example: "CARD"
+        customerDetails:
+          $ref: '#/components/schemas/CustomerDetails'
+        returnUrl:
+          type: string
+          format: uri
+          description: URL для возврата после оплаты
+          example: "http://localhost:8080/orders/12345"
+        metadata:
+          type: object
+          description: Дополнительные данные
+          additionalProperties:
+            type: string
+          example:
+            userId: "user123"
+            ipAddress: "192.168.1.1"
+
+    CustomerDetails:
+      type: object
+      properties:
+        userId:
+          type: string
+          description: ID пользователя в системе
+          example: "user123"
+        email:
+          type: string
+          format: email
+          description: Email покупателя
+          example: "user@example.com"
+        phone:
+          type: string
+          description: Номер телефона
+          example: "+79991234567"
+        name:
+          type: string
+          description: Имя покупателя
+          example: "Иван Иванов"
+
+    PaymentResponse:
+      type: object
+      required:
+        - paymentId
+        - status
+      properties:
+        paymentId:
+          type: string
+          format: uuid
+          description: Уникальный ID платежа
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        status:
+          $ref: '#/components/schemas/PaymentStatus'
+        paymentUrl:
+          type: string
+          format: uri
+          description: URL для перехода к оплате
+          example: "http://localhost:8081/payment/123e4567-e89b-12d3-a456-426614174000"
+        createdAt:
+          type: string
+          format: date-time
+          description: Дата создания платежа
+          example: "2026-03-05T15:30:00Z"
+        amount:
+          type: integer
+          description: Сумма платежа
+          example: 250000
+        errorMessage:
+          type: string
+          description: Сообщение об ошибке (при статусе FAILED)
+          example: "Недостаточно средств"
+
+    PaymentDetails:
+      allOf:
+        - $ref: '#/components/schemas/PaymentResponse'
+        - type: object
+          properties:
+            orderId:
+              type: string
+              description: ID заказа
+              example: "12345"
+            description:
+              type: string
+              description: Описание платежа
+              example: "Оплата заказа №12345"
+            paymentMethod:
+              type: string
+              description: Способ оплаты
+              example: "CARD"
+            metadata:
+              type: object
+              description: Дополнительные данные
+              additionalProperties:
+                type: string
+            paidAt:
+              type: string
+              format: date-time
+              description: Дата оплаты
+              example: "2026-03-05T15:31:00Z"
+            refundedAt:
+              type: string
+              format: date-time
+              description: Дата возврата
+              example: "2026-03-06T10:00:00Z"
+
+    BalanceResponse:
+      type: object
+      required:
+        - userId
+        - amount
+        - currency
+        - status
+      properties:
+        userId:
+          type: string
+          description: ID пользователя
+          example: "user123"
+        amount:
+          type: integer
+          description: Текущий баланс в минимальных единицах валюты
+          example: 1000000
+        currency:
+          type: string
+          description: Валюта
+          enum: [RUB, USD, EUR]
+          default: RUB
+        lastUpdated:
+          type: string
+          format: date-time
+          description: Время последнего обновления баланса
+          example: "2026-03-05T15:30:00Z"
+        status:
+          type: string
+          description: Статус баланса
+          enum: [AVAILABLE, UNAVAILABLE, SERVICE_DOWN]
+          example: "AVAILABLE"
+
+    RefundRequest:
+      type: object
+      properties:
+        amount:
+          type: integer
+          description: Сумма возврата (если не указана, возврат полной суммы)
+          minimum: 1
+          example: 250000
+        reason:
+          type: string
+          description: Причина возврата
+          maxLength: 500
+          example: "Возврат товара"
+
+    RefundResponse:
+      type: object
+      properties:
+        refundId:
+          type: string
+          format: uuid
+          description: ID возврата
+          example: "223e4567-e89b-12d3-a456-426614174000"
+        paymentId:
+          type: string
+          format: uuid
+          description: ID платежа
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        amount:
+          type: integer
+          description: Сумма возврата
+          example: 250000
+        status:
+          type: string
+          enum: [PENDING, COMPLETED, FAILED]
+          description: Статус возврата
+          example: "COMPLETED"
+        createdAt:
+          type: string
+          format: date-time
+          description: Дата создания возврата
+          example: "2026-03-06T10:00:00Z"
+
+    PaymentStatus:
+      type: string
+      enum:
+        - PENDING
+        - PROCESSING
+        - SUCCEEDED
+        - FAILED
+        - REFUNDED
+        - PARTIALLY_REFUNDED
+        - CANCELLED
+      description: Статус платежа
+      example: "SUCCEEDED"
+
+    ErrorResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Код ошибки
+          example: "INSUFFICIENT_FUNDS"
+        message:
+          type: string
+          description: Сообщение об ошибке
+          example: "Недостаточно средств на счете"
+        details:
+          type: object
+          description: Дополнительные детали ошибки
+          example:
+            available: 50000
+            required: 100000
+        timestamp:
+          type: string
+          format: date-time
+          description: Время ошибки
+          example: "2026-03-05T15:30:00Z"

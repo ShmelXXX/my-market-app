@@ -1,15 +1,15 @@
 version: '3.8'
 
 services:
-  app:
-    build: .
-    container_name: my-market-app
+  redis:
+    image: redis:7.2-alpine
+    container_name: mymarket-redis
     ports:
-      - "8080:8080"
-    environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - SPRING_DATASOURCE_URL=jdbc:h2:file:/data/mymarketdb
+      - "6379:6379"
     volumes:
-      - ./data:/data  # для сохранения H2 базы данных
-      - ./images:/app/static/images  # для загрузки изображений
+      - redis-data:/data
+    command: redis-server --appendonly yes
     restart: unless-stopped
+
+volumes:
+  redis-data:
