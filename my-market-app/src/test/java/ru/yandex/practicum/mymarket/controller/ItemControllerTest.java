@@ -73,6 +73,12 @@ class ItemControllerTest {
 
         items = Arrays.asList(item1, item2);
 
+        // Общая настройка для всех тестов
+        lenient().when(request.getSession()).thenReturn(session);
+        lenient().when(session.getId()).thenReturn(TEST_SESSION_ID);
+        lenient().when(cartService.getSessionId(request)).thenReturn(TEST_SESSION_ID);
+        lenient().when(cartService.isAuthenticated()).thenReturn(true);
+
     }
 
     @Test

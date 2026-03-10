@@ -9,10 +9,7 @@ import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
-
 import ru.yandex.practicum.mymarket.model.Item;
-
-
 
 import static org.assertj.core.api.Assertions.assertThat;
 @DataJpaTest
