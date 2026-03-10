@@ -2,15 +2,15 @@ package ru.yandex.practicum.mymarket.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.yandex.practicum.mymarket.client.PaymentWebClient;  // Заменили на WebClient
-import ru.yandex.practicum.mymarket.model.CartItem;
-import ru.yandex.practicum.mymarket.model.Item;
-import ru.yandex.practicum.mymarket.model.Order;
-import ru.yandex.practicum.mymarket.model.OrderItem;
+import ru.yandex.practicum.mymarket.model.*;
 import ru.yandex.practicum.mymarket.repository.CartItemRepository;
 import ru.yandex.practicum.mymarket.repository.OrderRepository;
+import ru.yandex.practicum.mymarket.repository.UserRepository;
 import ru.yandex.practicum.payment.model.BalanceResponse;  // Добавить импорт
 import ru.yandex.practicum.payment.model.PaymentRequest;
 import ru.yandex.practicum.payment.model.PaymentResponse;
@@ -28,16 +28,34 @@ public class OrderService {
     private final CartItemRepository cartItemRepository;
     private final CartService cartService;
     private final PaymentWebClient paymentWebClient;
+    private final UserRepository userRepository;
+
+    public User getCurrentUser() {
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (principal instanceof UserDetails) {
+            String username = ((UserDetails) principal).getUsername();
+            return userRepository.findByUsername(username).orElse(null);
+        }
+        return null;
+    }
 
     @Transactional
     public Order createOrder(String sessionId, String userId) {
-        if (sessionId == null || sessionId.trim().isEmpty()) {
-            throw new IllegalArgumentException("Некорректный ID сессии");
+        log.info("Creating order for session: {}, user: {}", sessionId, userId);
+
+        User currentUser = getCurrentUser();
+        log.info("Current user: {}", currentUser != null ? currentUser.getUsername() : "null");
+
+        if (currentUser == null) {
+            log.error("User not authenticated");
+            throw new IllegalStateException("Только авторизованные пользователи могут оформлять заказы");
         }
 
-        List<CartItem> cartItems = cartItemRepository.findBySessionId(sessionId);
+        List<CartItem> cartItems = cartService.getCartItems(sessionId);
+        log.info("Cart items count: {}", cartItems.size());
 
         if (cartItems.isEmpty()) {
+            log.error("Cart is empty");
             throw new IllegalStateException("Корзина пуста");
         }
 
@@ -55,6 +73,7 @@ public class OrderService {
         // Создаем заказ
         Order order = new Order();
         order.setOrderDate(LocalDateTime.now());
+        order.setUser(currentUser);
 
         long totalSum = 0;
 
@@ -79,7 +98,7 @@ public class OrderService {
 
         // Создаем платеж
         try {
-            PaymentResponse paymentResponse = createPaymentForOrder(savedOrder, userId);
+            PaymentResponse paymentResponse = createPaymentForOrder(savedOrder, currentUser.getUsername());
             log.info("Платеж создан: {}", paymentResponse.getPaymentId());
 
             // Очищаем корзину после успешного платежа
@@ -126,12 +145,23 @@ public class OrderService {
     }
 
     public List<Order> getAllOrders() {
-        return orderRepository.findAll();
+        User currentUser = getCurrentUser();
+        if (currentUser != null) {
+            return orderRepository.findByUser(currentUser);
+        }
+        return List.of(); // Анонимные пользователи не видят заказы
     }
 
     public Order getOrderById(Long id) {
-        return orderRepository.findById(id)
+        Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Заказ не найден"));
+
+        User currentUser = getCurrentUser();
+        if (currentUser == null || !order.getUser().getId().equals(currentUser.getId())) {
+            throw new RuntimeException("У вас нет доступа к этому заказу");
+        }
+
+        return order;
     }
 
     public boolean checkBalance(String userId, Long requiredAmount) {

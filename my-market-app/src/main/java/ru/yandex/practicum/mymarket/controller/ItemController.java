@@ -53,6 +53,11 @@ public class ItemController {
             HttpServletRequest request,
             Model model) {
 
+//        // Проверка, авторизован ли пользователь
+//        if (!cartService.isAuthenticated()) {
+//            return "redirect:/login";
+//        }
+
         String sessionId = cartService.getSessionId(request);
         Page<Item> itemPage = itemService.getItems(search, sort, pageNumber, pageSize);
 
@@ -112,6 +117,11 @@ public class ItemController {
             @RequestParam(required = false, defaultValue = "1") int pageNumber,
             @RequestParam(required = false, defaultValue = "5") int pageSize,
             HttpServletRequest request) {
+
+        // Проверка, авторизован ли пользователь
+        if (!cartService.isAuthenticated()) {
+            return "redirect:/login";
+        }
 
         String sessionId = cartService.getSessionId(request);
         cartService.updateCartItem(id, action, sessionId);

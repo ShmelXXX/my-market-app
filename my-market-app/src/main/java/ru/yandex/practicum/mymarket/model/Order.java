@@ -27,4 +27,8 @@ public class Order implements Serializable {
 
     @Column(nullable = false)
     private Long totalSum;
+
+    @ManyToOne
+    @JoinColumn(name = "user_id")
+    private User user;  // Связь с пользователем
 }

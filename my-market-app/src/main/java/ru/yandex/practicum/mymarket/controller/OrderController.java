@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import ru.yandex.practicum.mymarket.dto.ItemDto;
 import ru.yandex.practicum.mymarket.dto.OrderDto;
 import ru.yandex.practicum.mymarket.model.Order;
+import ru.yandex.practicum.mymarket.service.CartService;
 import ru.yandex.practicum.mymarket.service.OrderService;
 
 import java.util.List;
@@ -23,10 +24,16 @@ import java.util.stream.Collectors;
 public class OrderController {
 
     private final OrderService orderService;
-//    private final CartService cartService;
+    private final CartService cartService;
 
     @GetMapping
     public String getOrders(Model model) {
+
+        // Проверка, авторизован ли пользователь
+        if (!cartService.isAuthenticated()) {
+            return "redirect:/login";
+        }
+
         List<Order> orders = orderService.getAllOrders();
 
         List<OrderDto> orderDtos = orders.stream()
@@ -45,6 +52,11 @@ public class OrderController {
 
             @RequestParam(required = false, defaultValue = "false") boolean newOrder,
             Model model) {
+
+        // Проверка, авторизован ли пользователь
+        if (!cartService.isAuthenticated()) {
+            return "redirect:/login";
+        }
 
         Order order = orderService.getOrderById(id);
 
