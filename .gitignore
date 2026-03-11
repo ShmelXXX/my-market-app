@@ -32,3 +32,8 @@ docker
 **/static/images/*.jpg
 **/static/images/*.jpeg
 **/static/images/*.gif
+
+# Secret files
+application-secret.properties
+
+

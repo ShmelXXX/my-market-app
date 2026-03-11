@@ -1,4 +1,3 @@
-// PaymentWebClient.java
 package ru.yandex.practicum.mymarket.client;
 
 import lombok.RequiredArgsConstructor;

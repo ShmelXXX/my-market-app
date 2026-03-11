@@ -11,7 +11,9 @@ import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import ru.yandex.practicum.payment.model.*;
 import ru.yandex.practicum.paymentservice.model.PaymentEntity;
+import ru.yandex.practicum.paymentservice.model.UserBalance;
 import ru.yandex.practicum.paymentservice.repository.ReactivePaymentRepository;
+import ru.yandex.practicum.paymentservice.repository.UserBalanceRepository;
 
 import java.net.URI;
 import java.time.Instant;
@@ -28,12 +30,16 @@ class ReactivePaymentServiceTest {
     @Mock
     private ReactivePaymentRepository paymentRepository;
 
+    @Mock
+    private UserBalanceRepository userBalanceRepository;
+
     @InjectMocks
     private ReactivePaymentService paymentService;
 
     private PaymentRequest validRequest;
     private PaymentRequest invalidRequest;
     private PaymentEntity savedEntity;
+    private UserBalance userBalance;
     private final String TEST_USER_ID = "user1";
     private final String TEST_ORDER_ID = "order-123";
     private final Integer TEST_AMOUNT = 10000; // 100 руб
@@ -63,11 +69,19 @@ class ReactivePaymentServiceTest {
         savedEntity.setCurrency("RUB");
         savedEntity.setStatus(PaymentStatus.SUCCEEDED.toString());
         savedEntity.setCreatedAt(Instant.now());
+
+        userBalance = new UserBalance();
+        userBalance.setUserId(TEST_USER_ID);
+        userBalance.setBalance(100000L);
+        userBalance.setCurrency("RUB");
+        userBalance.setUpdatedAt(Instant.now());
     }
 
     @Test
     @DisplayName("Должен успешно создать платеж при достаточном балансе")
     void shouldCreatePaymentSuccessfully() {
+        when(userBalanceRepository.findByUserId(TEST_USER_ID)).thenReturn(Mono.just(userBalance));
+        when(userBalanceRepository.save(any(UserBalance.class))).thenReturn(Mono.just(userBalance));
         when(paymentRepository.save(any(PaymentEntity.class))).thenReturn(Mono.just(savedEntity));
 
         Mono<PaymentResponse> result = paymentService.createPayment(validRequest);
@@ -81,11 +95,17 @@ class ReactivePaymentServiceTest {
                 .verifyComplete();
 
         verify(paymentRepository).save(any(PaymentEntity.class));
+        verify(userBalanceRepository).save(any(UserBalance.class));
+        verify(userBalanceRepository).findByUserId(TEST_USER_ID);
     }
 
     @Test
     @DisplayName("Должен отклонить платеж при недостаточном балансе")
     void shouldFailPaymentWhenInsufficientFunds() {
+
+        userBalance.setBalance(100L); // Маленький баланс
+        when(userBalanceRepository.findByUserId(TEST_USER_ID)).thenReturn(Mono.just(userBalance));
+
         Mono<PaymentResponse> result = paymentService.createPayment(invalidRequest);
 
         StepVerifier.create(result)
@@ -96,6 +116,8 @@ class ReactivePaymentServiceTest {
                 .verifyComplete();
 
         verify(paymentRepository, never()).save(any(PaymentEntity.class));
+        verify(userBalanceRepository, never()).save(any(UserBalance.class));
+        verify(userBalanceRepository).findByUserId(TEST_USER_ID);
     }
 
     @Test
@@ -105,7 +127,7 @@ class ReactivePaymentServiceTest {
         request.setDescription("Оплата заказа|userId=user123|доп.инфо");
 
         // Используем рефлексию для вызова приватного метода
-        java.lang.reflect.Method method = null;
+        java.lang.reflect.Method method;
         try {
             method = ReactivePaymentService.class.getDeclaredMethod("extractUserIdFromRequest", PaymentRequest.class);
             method.setAccessible(true);
@@ -149,17 +171,20 @@ class ReactivePaymentServiceTest {
     @Test
     @DisplayName("Должен получить баланс пользователя")
     void shouldGetUserBalance() {
-        String userId = "user1";
+        when(userBalanceRepository.findByUserId(TEST_USER_ID)).thenReturn(Mono.just(userBalance));
 
-        Mono<BalanceResponse> result = paymentService.getUserBalance(userId);
+        Mono<BalanceResponse> result = paymentService.getUserBalance(TEST_USER_ID);
 
         StepVerifier.create(result)
                 .assertNext(balance -> {
-                    assertThat(balance.getUserId()).isEqualTo(userId);
+                    assertThat(balance.getUserId()).isEqualTo(TEST_USER_ID);
                     assertThat(balance.getAmount()).isPositive();
                     assertThat(balance.getCurrency()).isEqualTo(BalanceResponse.CurrencyEnum.RUB);
                     assertThat(balance.getStatus()).isEqualTo(BalanceResponse.StatusEnum.AVAILABLE);
                 })
                 .verifyComplete();
+
+        verify(userBalanceRepository).findByUserId(TEST_USER_ID);
+        verify(userBalanceRepository, never()).save(any());
     }
 }

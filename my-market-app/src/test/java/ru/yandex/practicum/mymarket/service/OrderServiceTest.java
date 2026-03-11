@@ -9,13 +9,18 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.client.PaymentWebClient;
 import ru.yandex.practicum.mymarket.model.CartItem;
 import ru.yandex.practicum.mymarket.model.Item;
 import ru.yandex.practicum.mymarket.model.Order;
+import ru.yandex.practicum.mymarket.model.User;
 import ru.yandex.practicum.mymarket.repository.CartItemRepository;
 import ru.yandex.practicum.mymarket.repository.OrderRepository;
+import ru.yandex.practicum.mymarket.repository.UserRepository;
 import ru.yandex.practicum.payment.model.PaymentResponse;
 import ru.yandex.practicum.payment.model.PaymentStatus;
 
@@ -45,6 +50,15 @@ class OrderServiceTest {
     @Mock
     private PaymentWebClient paymentWebClient;
 
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private Authentication authentication;
+
+    @Mock
+    private SecurityContext securityContext;
+
     @InjectMocks
     private OrderService orderService;
 
@@ -58,6 +72,8 @@ class OrderServiceTest {
     private CartItem cartItem1;
     private CartItem cartItem2;
     private PaymentResponse successPaymentResponse;
+
+    private User testUser;
 
     @BeforeEach
     void setUp() {
@@ -88,25 +104,41 @@ class OrderServiceTest {
         successPaymentResponse = new PaymentResponse();
         successPaymentResponse.setPaymentId(UUID.randomUUID());
         successPaymentResponse.setStatus(PaymentStatus.SUCCEEDED);
+
+        testUser = new User();
+        testUser.setId(1L);
+        testUser.setUsername("testuser");
+        testUser.setPassword("password");
+        testUser.setEmail("test@example.com");
+
+        // Настройка SecurityContext
+        lenient().when(securityContext.getAuthentication()).thenReturn(authentication);
+        lenient().when(authentication.getPrincipal()).thenReturn(testUser);
+        lenient().when(authentication.isAuthenticated()).thenReturn(true);
+        SecurityContextHolder.setContext(securityContext);
     }
 
     @Test
     @DisplayName("Должен создать заказ из корзины с успешным платежом")
     void shouldCreateOrderFromCartWithSuccessfulPayment() {
+
+        when(userRepository.findByUsername(testUser.getUsername())).thenReturn(Optional.of(testUser));
+
         List<CartItem> cartItems = Arrays.asList(cartItem1, cartItem2);
-        when(cartItemRepository.findBySessionId(TEST_SESSION_ID)).thenReturn(cartItems);
+        when(cartService.getCartItems(TEST_SESSION_ID)).thenReturn(cartItems);
 
         // Создаем savedOrder с правильными значениями
         Order savedOrder = new Order();
         savedOrder.setId(1L);
         savedOrder.setOrderDate(LocalDateTime.now());
         savedOrder.setTotalSum(3500L); // ВАЖНО: устанавливаем totalSum
+        savedOrder.setUser(testUser);
 
         when(orderRepository.save(any(Order.class))).thenReturn(savedOrder);
 
         when(paymentWebClient.createPayment(any())).thenReturn(Mono.just(successPaymentResponse));
 
-        Order order = orderService.createOrder(TEST_SESSION_ID, TEST_USER_ID);
+        Order order = orderService.createOrder(TEST_SESSION_ID, testUser.getUsername());
 
         assertThat(order.getId()).isEqualTo(1L);
         assertThat(order.getTotalSum()).isEqualTo(3500L);
@@ -118,37 +150,45 @@ class OrderServiceTest {
         assertThat(capturedOrder.getTotalSum()).isEqualTo(3500L);
         assertThat(capturedOrder.getOrderDate()).isNotNull();
 
+        assertThat(capturedOrder.getUser()).isEqualTo(testUser);
+
         verify(cartService).clearCart(TEST_SESSION_ID);
         verify(paymentWebClient).createPayment(any());
     }
 
     @Test
-    @DisplayName("Должен получить все заказы")
-    void shouldGetAllOrders() {
+    @DisplayName("Должен получить все заказы для текущего пользователя")
+    void shouldGetAllOrdersForCurrentUser() {
+        when(userRepository.findByUsername(testUser.getUsername())).thenReturn(Optional.of(testUser));
+
         Order order1 = new Order();
         order1.setId(1L);
         order1.setTotalSum(1000L);
+        order1.setUser(testUser);
 
         Order order2 = new Order();
         order2.setId(2L);
         order2.setTotalSum(2000L);
+        order2.setUser(testUser);
 
         List<Order> expectedOrders = Arrays.asList(order1, order2);
-
-        when(orderRepository.findAll()).thenReturn(expectedOrders);
+        when(orderRepository.findByUser(testUser)).thenReturn(expectedOrders);
 
         List<Order> actualOrders = orderService.getAllOrders();
 
         assertThat(actualOrders).hasSize(2);
-        verify(orderRepository).findAll();
+        verify(orderRepository).findByUser(testUser);
     }
 
     @Test
-    @DisplayName("Должен получить заказ по ID")
-    void shouldGetOrderById() {
+    @DisplayName("Должен получить заказ по ID для текущего пользователя")
+    void shouldGetOrderByIdForCurrentUser() {
+        when(userRepository.findByUsername(testUser.getUsername())).thenReturn(Optional.of(testUser));
+
         Order order = new Order();
         order.setId(1L);
         order.setTotalSum(1000L);
+        order.setUser(testUser);
 
         when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
 

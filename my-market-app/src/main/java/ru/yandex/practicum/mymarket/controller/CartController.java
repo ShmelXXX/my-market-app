@@ -21,6 +21,12 @@ public class CartController {
 
     @GetMapping("/items")
     public String getCart(HttpServletRequest request, Model model) {
+
+        // Проверка, авторизован ли пользователь
+        if (!cartService.isAuthenticated()) {
+            return "redirect:/login";
+        }
+
         String sessionId = cartService.getSessionId(request);
         List<CartItem> cartItems = cartService.getCartItems(sessionId);
 
@@ -49,6 +55,11 @@ public class CartController {
             @RequestParam String action,
             HttpServletRequest request,
             Model model) {
+
+        // Проверка, авторизован ли пользователь
+        if (!cartService.isAuthenticated()) {
+            return "redirect:/login";
+        }
 
         String sessionId = cartService.getSessionId(request);
         cartService.updateCartItem(id, action, sessionId);

@@ -23,5 +23,9 @@ public class CartItem implements Serializable {
     private Integer quantity;
 
     @Column(nullable = false)
-    private String sessionId;
+    private String sessionId;  // Для анонимных пользователей
+
+    @ManyToOne
+    @JoinColumn(name = "user_id")
+    private User user;  // Для авторизованных пользователей
 }
